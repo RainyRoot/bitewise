@@ -34,5 +34,7 @@ mobile/dist/
 .DS_Store
 Thumbs.db
 
-# Claude
+# Claude / Internal docs
 CLAUDE.md
+PLAN*.md
+PHASE*.md
