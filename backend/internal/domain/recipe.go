@@ -7,6 +7,7 @@ import (
 
 type Recipe struct {
 	ID                 int64           `json:"id"`
+	UserID             *int64          `json:"user_id,omitempty"`
 	Title              string          `json:"title"`
 	Description        string          `json:"description"`
 	SourceURL          string          `json:"source_url"`
@@ -25,6 +26,7 @@ type Recipe struct {
 	Allergens          []string        `json:"allergens,omitempty"`
 	Categories         []string        `json:"categories,omitempty"`
 	Ingredients        []Ingredient    `json:"ingredients,omitempty"`
+	Instructions       string          `json:"instructions,omitempty"`
 	IsFavorite         bool            `json:"is_favorite,omitempty"`
 	CreatedAt          time.Time       `json:"created_at"`
 }
@@ -42,4 +44,27 @@ type RecipeFilter struct {
 	MaxPrepTime  int      `json:"max_prep_time"`
 	Limit        int      `json:"limit"`
 	Offset       int      `json:"offset"`
+}
+
+type CreateRecipeRequest struct {
+	Title              string       `json:"title"`
+	Description        string       `json:"description"`
+	PrepTimeMin        int          `json:"prep_time_min"`
+	CookTimeMin        int          `json:"cook_time_min"`
+	Servings           int          `json:"servings"`
+	Difficulty         string       `json:"difficulty"`
+	ImageURL           string       `json:"image_url"`
+	CaloriesPerServing int          `json:"calories_per_serving"`
+	ProteinG           float64      `json:"protein_g"`
+	CarbsG             float64      `json:"carbs_g"`
+	FatG               float64      `json:"fat_g"`
+	FiberG             float64      `json:"fiber_g"`
+	Allergens          []string     `json:"allergens"`
+	Categories         []string     `json:"categories"`
+	Ingredients        []Ingredient `json:"ingredients"`
+	Instructions       string       `json:"instructions"`
+}
+
+type ImportRecipeRequest struct {
+	URL string `json:"url"`
 }

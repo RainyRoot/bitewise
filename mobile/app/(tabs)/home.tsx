@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { tracking, water } from '@/services/api';
+import { offlineCache, isOnline, syncOfflineQueue } from '@/services/offline';
 import type { NutritionSummary, FoodLog } from '@/types';
 
 const PRIMARY = '#4CAF50';
@@ -29,12 +31,24 @@ export default function HomeScreen() {
   const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
   const [waterTotal, setWaterTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
 
   const calorieTarget = user?.calorie_target || 2200;
   const waterTarget = user?.daily_water_ml_goal || 2500;
   const today = new Date().toISOString().split('T')[0];
 
   const fetchData = async () => {
+    const online = await isOnline();
+    setOffline(!online);
+
+    if (online) {
+      // Sync any queued offline actions
+      await syncOfflineQueue({
+        food_log: async (data) => { await tracking.logFood(data); },
+        water_log: async (data) => { await water.logWater(data); },
+      });
+    }
+
     try {
       const [summaryData, logs, waterLogs] = await Promise.all([
         tracking.getSummary(today).catch(() => null),
@@ -45,8 +59,21 @@ export default function HomeScreen() {
       setFoodLogs(logs || []);
       const totalWater = (waterLogs || []).reduce((sum, w) => sum + w.amount_ml, 0);
       setWaterTotal(totalWater);
+
+      // Cache for offline
+      if (online) {
+        await offlineCache.set('home_summary', summaryData);
+        await offlineCache.set('home_food_logs', logs);
+        await offlineCache.set('home_water_total', totalWater);
+      }
     } catch {
-      // ignore
+      // Try loading from cache
+      const cachedSummary = await offlineCache.get<NutritionSummary>('home_summary');
+      const cachedLogs = await offlineCache.get<FoodLog[]>('home_food_logs');
+      const cachedWater = await offlineCache.get<number>('home_water_total');
+      if (cachedSummary) setSummary(cachedSummary);
+      if (cachedLogs) setFoodLogs(cachedLogs);
+      if (cachedWater) setWaterTotal(cachedWater);
     } finally {
       setLoading(false);
     }
@@ -92,6 +119,12 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {offline && (
+          <View style={styles.offlineBanner}>
+            <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
+            <Text style={styles.offlineText}>Offline-Modus - Daten aus Cache</Text>
+          </View>
+        )}
         <Text style={styles.greeting}>Hallo, {user?.name || 'User'}!</Text>
         <Text style={styles.subtitle}>Dein heutiger Überblick</Text>
 
@@ -210,4 +243,6 @@ const styles = StyleSheet.create({
   mealType: { fontSize: 12, color: '#757575', textTransform: 'uppercase', letterSpacing: 0.5 },
   mealName: { fontSize: 16, color: '#212121', marginTop: 2 },
   mealCalories: { fontSize: 16, fontWeight: '600', color: PRIMARY },
+  offlineBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FF9800', paddingVertical: 8, borderRadius: 8, marginBottom: 12 },
+  offlineText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });

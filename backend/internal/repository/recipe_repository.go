@@ -21,6 +21,8 @@ type RecipeRepository interface {
 	IsFavorite(ctx context.Context, userID, recipeID int64) (bool, error)
 	GetRandomExcludingAllergens(ctx context.Context, allergens []string, limit int) ([]domain.Recipe, error)
 	Count(ctx context.Context) (int, error)
+	GetByUser(ctx context.Context, userID int64, limit, offset int) ([]domain.Recipe, error)
+	Delete(ctx context.Context, id, userID int64) error
 }
 
 type SQLiteRecipeRepository struct {
@@ -39,14 +41,14 @@ func (r *SQLiteRecipeRepository) Create(ctx context.Context, recipe *domain.Reci
 	recipe.CreatedAt = time.Now().UTC()
 
 	result, err := r.db.ExecContext(ctx,
-		`INSERT INTO recipes (title, description, source_url, source_site, prep_time_min, cook_time_min, servings, difficulty, image_url, calories_per_serving, protein_g, carbs_g, fat_g, fiber_g, micronutrients, allergens, categories, ingredients, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO recipes (title, description, source_url, source_site, prep_time_min, cook_time_min, servings, difficulty, image_url, calories_per_serving, protein_g, carbs_g, fat_g, fiber_g, micronutrients, allergens, categories, ingredients, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		recipe.Title, recipe.Description, recipe.SourceURL, recipe.SourceSite,
 		recipe.PrepTimeMin, recipe.CookTimeMin, recipe.Servings, recipe.Difficulty,
 		recipe.ImageURL, recipe.CaloriesPerServing, recipe.ProteinG, recipe.CarbsG,
 		recipe.FatG, recipe.FiberG, recipe.Micronutrients,
 		string(allergensJSON), string(categoriesJSON), string(ingredientsJSON),
-		recipe.CreatedAt,
+		recipe.UserID, recipe.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("inserting recipe: %w", err)
@@ -311,4 +313,60 @@ func (r *SQLiteRecipeRepository) Count(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("counting recipes: %w", err)
 	}
 	return count, nil
+}
+
+func (r *SQLiteRecipeRepository) GetByUser(ctx context.Context, userID int64, limit, offset int) ([]domain.Recipe, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, title, description, source_url, source_site, prep_time_min, cook_time_min, servings, difficulty, image_url, calories_per_serving, protein_g, carbs_g, fat_g, fiber_g, allergens, categories, ingredients, user_id, created_at
+		 FROM recipes WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		userID, limit, offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying user recipes: %w", err)
+	}
+	defer rows.Close()
+
+	var recipes []domain.Recipe
+	for rows.Next() {
+		var rec domain.Recipe
+		var allergensStr, categoriesStr, ingredientsStr sql.NullString
+		if err := rows.Scan(
+			&rec.ID, &rec.Title, &rec.Description, &rec.SourceURL, &rec.SourceSite,
+			&rec.PrepTimeMin, &rec.CookTimeMin, &rec.Servings, &rec.Difficulty,
+			&rec.ImageURL, &rec.CaloriesPerServing, &rec.ProteinG, &rec.CarbsG,
+			&rec.FatG, &rec.FiberG,
+			&allergensStr, &categoriesStr, &ingredientsStr, &rec.UserID, &rec.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scanning user recipe: %w", err)
+		}
+		if allergensStr.Valid {
+			json.Unmarshal([]byte(allergensStr.String), &rec.Allergens)
+		}
+		if categoriesStr.Valid {
+			json.Unmarshal([]byte(categoriesStr.String), &rec.Categories)
+		}
+		if ingredientsStr.Valid {
+			json.Unmarshal([]byte(ingredientsStr.String), &rec.Ingredients)
+		}
+		recipes = append(recipes, rec)
+	}
+	return recipes, rows.Err()
+}
+
+func (r *SQLiteRecipeRepository) Delete(ctx context.Context, id, userID int64) error {
+	result, err := r.db.ExecContext(ctx,
+		`DELETE FROM recipes WHERE id = ? AND user_id = ?`, id, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("deleting recipe: %w", err)
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return fmt.Errorf("recipe not found or not owned by user")
+	}
+	return nil
 }

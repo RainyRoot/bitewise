@@ -1,12 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
+  Achievement,
   AuthResponse,
+  CreateRecipeRequest,
   FoodItem,
   FoodLog,
   FoodLogRequest,
   LoginRequest,
   MealPlan,
   MealPlanEntry,
+  MonthlyStats,
   NutritionSummary,
   PantryItem,
   PantryMatch,
@@ -14,10 +17,15 @@ import type {
   RecipeFilter,
   RegisterRequest,
   SeasonalResponse,
+  SharedRecipe,
   ShoppingList,
+  StreakInfo,
   User,
+  UserAchievement,
+  UserNotification,
   WaterLog,
   WaterLogRequest,
+  WeeklyStats,
 } from '@/types';
 
 const TOKEN_KEY = 'bitewise_token';
@@ -166,6 +174,29 @@ export const recipes = {
       method: 'DELETE',
     });
   },
+
+  create: async (data: CreateRecipeRequest): Promise<Recipe> => {
+    return request<Recipe>('/api/v1/recipes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getMine: async (): Promise<Recipe[]> => {
+    return request<Recipe[]>('/api/v1/recipes/mine');
+  },
+
+  delete: async (id: number): Promise<void> => {
+    return request<void>(`/api/v1/recipes/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  share: async (recipeId: number): Promise<SharedRecipe> => {
+    return request<SharedRecipe>(`/api/v1/recipes/${recipeId}/share`, {
+      method: 'POST',
+    });
+  },
 };
 
 // Meal Plans
@@ -293,6 +324,59 @@ export const seasonal = {
   },
 };
 
+// Achievements
+export const achievements = {
+  getAll: async (): Promise<Achievement[]> => {
+    return request<Achievement[]>('/api/v1/achievements');
+  },
+
+  getMine: async (): Promise<UserAchievement[]> => {
+    return request<UserAchievement[]>('/api/v1/achievements/mine');
+  },
+};
+
+// Sharing
+export const sharing = {
+  getSharedRecipe: async (code: string): Promise<Recipe> => {
+    return request<Recipe>(`/api/v1/shared/${code}`);
+  },
+
+  saveSharedRecipe: async (code: string): Promise<Recipe> => {
+    return request<Recipe>(`/api/v1/shared/${code}/save`, {
+      method: 'POST',
+    });
+  },
+};
+
+// Notifications
+export const notifications = {
+  getSettings: async (): Promise<UserNotification[]> => {
+    return request<UserNotification[]>('/api/v1/notifications');
+  },
+
+  updateSettings: async (notifs: UserNotification[]): Promise<UserNotification[]> => {
+    return request<UserNotification[]>('/api/v1/notifications', {
+      method: 'PUT',
+      body: JSON.stringify({ notifications: notifs }),
+    });
+  },
+};
+
+// Statistics
+export const stats = {
+  getWeekly: async (): Promise<WeeklyStats> => {
+    return request<WeeklyStats>('/api/v1/stats/weekly');
+  },
+
+  getMonthly: async (): Promise<MonthlyStats> => {
+    return request<MonthlyStats>('/api/v1/stats/monthly');
+  },
+
+  getStreaks: async (): Promise<StreakInfo> => {
+    return request<StreakInfo>('/api/v1/stats/streaks');
+  },
+};
+
 export const api = {
   auth,
   profile,
@@ -304,6 +388,10 @@ export const api = {
   shoppingLists,
   pantry,
   seasonal,
+  achievements,
+  sharing,
+  notifications,
+  stats,
 };
 
 export default api;

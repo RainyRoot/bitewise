@@ -43,6 +43,30 @@ export default function RootLayout() {
             title: 'Barcode Scanner',
           }}
         />
+        <Stack.Screen
+          name="achievements"
+          options={{
+            title: 'Achievements',
+          }}
+        />
+        <Stack.Screen
+          name="create-recipe"
+          options={{
+            title: 'Rezept erstellen',
+          }}
+        />
+        <Stack.Screen
+          name="notification-settings"
+          options={{
+            title: 'Benachrichtigungen',
+          }}
+        />
+        <Stack.Screen
+          name="stats"
+          options={{
+            title: 'Statistiken',
+          }}
+        />
       </Stack>
     </AuthProvider>
   );

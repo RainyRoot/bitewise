@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -146,4 +147,81 @@ func (h *RecipeHandler) GetFavorites(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.JSON(w, http.StatusOK, recipes)
+}
+
+func (h *RecipeHandler) CreateRecipe(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == 0 {
+		httputil.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req domain.CreateRecipeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Title == "" {
+		httputil.Error(w, http.StatusBadRequest, "title is required")
+		return
+	}
+
+	recipe, err := h.recipes.CreateCustomRecipe(r.Context(), userID, req)
+	if err != nil {
+		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	httputil.Created(w, recipe)
+}
+
+func (h *RecipeHandler) GetMyRecipes(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == 0 {
+		httputil.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	limit := 20
+	offset := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			limit = i
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			offset = i
+		}
+	}
+
+	recipes, err := h.recipes.GetMyRecipes(r.Context(), userID, limit, offset)
+	if err != nil {
+		httputil.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, recipes)
+}
+
+func (h *RecipeHandler) DeleteRecipe(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == 0 {
+		httputil.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid recipe id")
+		return
+	}
+
+	if err := h.recipes.DeleteRecipe(r.Context(), id, userID); err != nil {
+		httputil.Error(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	httputil.NoContent(w)
 }

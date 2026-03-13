@@ -61,3 +61,46 @@ func (s *RecipeService) GetFavorites(ctx context.Context, userID int64, limit, o
 	}
 	return recipes, nil
 }
+
+func (s *RecipeService) CreateCustomRecipe(ctx context.Context, userID int64, req domain.CreateRecipeRequest) (*domain.Recipe, error) {
+	recipe := &domain.Recipe{
+		UserID:             &userID,
+		Title:              req.Title,
+		Description:        req.Description,
+		PrepTimeMin:        req.PrepTimeMin,
+		CookTimeMin:        req.CookTimeMin,
+		Servings:           req.Servings,
+		Difficulty:         req.Difficulty,
+		ImageURL:           req.ImageURL,
+		CaloriesPerServing: req.CaloriesPerServing,
+		ProteinG:           req.ProteinG,
+		CarbsG:             req.CarbsG,
+		FatG:               req.FatG,
+		FiberG:             req.FiberG,
+		Allergens:          req.Allergens,
+		Categories:         req.Categories,
+		Ingredients:        req.Ingredients,
+		Instructions:       req.Instructions,
+		SourceSite:         "custom",
+	}
+
+	if err := s.recipes.Create(ctx, recipe); err != nil {
+		return nil, fmt.Errorf("creating custom recipe: %w", err)
+	}
+	return recipe, nil
+}
+
+func (s *RecipeService) GetMyRecipes(ctx context.Context, userID int64, limit, offset int) ([]domain.Recipe, error) {
+	recipes, err := s.recipes.GetByUser(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("getting user recipes: %w", err)
+	}
+	return recipes, nil
+}
+
+func (s *RecipeService) DeleteRecipe(ctx context.Context, id, userID int64) error {
+	if err := s.recipes.Delete(ctx, id, userID); err != nil {
+		return fmt.Errorf("deleting recipe: %w", err)
+	}
+	return nil
+}

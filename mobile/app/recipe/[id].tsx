@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -72,13 +73,25 @@ export default function RecipeDetailScreen() {
         {/* Title & Actions */}
         <View style={styles.titleRow}>
           <Text style={styles.title}>{recipe.title}</Text>
-          <TouchableOpacity onPress={toggleFavorite}>
-            <Ionicons
-              name={isFavorite ? 'heart' : 'heart-outline'}
-              size={28}
-              color={isFavorite ? '#E91E63' : '#BDBDBD'}
-            />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={async () => {
+              try {
+                const shared = await recipes.share(recipe.id);
+                Alert.alert('Geteilt!', `Share-Code: ${shared.share_code}`);
+              } catch {
+                Alert.alert('Fehler', 'Rezept konnte nicht geteilt werden.');
+              }
+            }}>
+              <Ionicons name="share-outline" size={26} color="#757575" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleFavorite}>
+              <Ionicons
+                name={isFavorite ? 'heart' : 'heart-outline'}
+                size={28}
+                color={isFavorite ? '#E91E63' : '#BDBDBD'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {recipe.description ? (

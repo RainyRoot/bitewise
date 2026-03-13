@@ -79,7 +79,6 @@ export default function TrackScreen() {
     try {
       await tracking.logFood({
         food_name: food.name,
-        name: food.name,
         meal_type: selectedMeal,
         date: today,
         servings: 1,
@@ -87,8 +86,6 @@ export default function TrackScreen() {
         protein_g: food.protein_g,
         carbs_g: food.carbs_g,
         fat_g: food.fat_g,
-        amount: 1,
-        unit: 'Portion',
       });
       Alert.alert('Hinzugefügt', `${food.name} zu ${MEAL_LABELS[selectedMeal]} hinzugefügt`);
       fetchLogs();
@@ -102,7 +99,6 @@ export default function TrackScreen() {
     try {
       await tracking.logFood({
         food_name: foodName,
-        name: foodName,
         meal_type: selectedMeal,
         date: today,
         servings: 1,
@@ -110,8 +106,6 @@ export default function TrackScreen() {
         protein_g: 0,
         carbs_g: 0,
         fat_g: 0,
-        amount: 1,
-        unit: 'Portion',
       });
       Alert.alert('Hinzugefügt', `${foodName} (${calories} kcal) erfasst`);
       setFoodName('');

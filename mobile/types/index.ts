@@ -216,3 +216,93 @@ export interface SeasonalResponse {
   month: string;
   items: SeasonalItem[];
 }
+
+// Achievement types
+export interface Achievement {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  condition_type: string;
+  condition_value: number;
+}
+
+export interface UserAchievement {
+  user_id: number;
+  achievement_id: number;
+  achievement?: Achievement;
+  unlocked_at: string;
+}
+
+// Sharing types
+export interface SharedRecipe {
+  id: number;
+  recipe_id: number;
+  share_code: string;
+  created_by: number;
+  created_at: string;
+}
+
+// Notification types
+export interface UserNotification {
+  id: number;
+  user_id: number;
+  type: string;
+  time: string;
+  enabled: boolean;
+}
+
+// Stats types
+export interface DailyStat {
+  date: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  water_ml: number;
+}
+
+export interface WeeklyStats {
+  days: DailyStat[];
+  avg_calories: number;
+  avg_water_ml: number;
+}
+
+export interface MonthlyStats {
+  days: DailyStat[];
+  avg_calories: number;
+  avg_water_ml: number;
+}
+
+export interface StreakInfo {
+  current_streak: number;
+  longest_streak: number;
+}
+
+// Custom Recipe types
+export interface SimpleIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface CreateRecipeRequest {
+  title: string;
+  description?: string;
+  prep_time_min?: number;
+  cook_time_min?: number;
+  servings?: number;
+  difficulty?: string;
+  image_url?: string;
+  calories_per_serving?: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fat_g?: number;
+  fiber_g?: number;
+  allergens?: string[];
+  categories?: string[];
+  ingredients?: SimpleIngredient[];
+  instructions?: string;
+}

@@ -125,14 +125,16 @@ export default function ProfileScreen() {
             value={user?.daily_water_ml_goal ? `${user.daily_water_ml_goal} ml` : ''}
           />
           <MenuItem icon="heart-outline" label="Favoriten" />
-          <MenuItem icon="trophy-outline" label="Achievements" />
+          <MenuItem icon="trophy-outline" label="Achievements" onPress={() => router.push('/achievements')} />
+          <MenuItem icon="stats-chart-outline" label="Statistiken" onPress={() => router.push('/stats')} />
+          <MenuItem icon="book-outline" label="Meine Rezepte" onPress={() => router.push('/create-recipe')} />
         </View>
 
         {/* Settings */}
         <View style={styles.card}>
-          <MenuItem icon="notifications-outline" label="Benachrichtigungen" />
+          <MenuItem icon="notifications-outline" label="Benachrichtigungen" onPress={() => router.push('/notification-settings')} />
           <MenuItem icon="moon-outline" label="Erscheinungsbild" value="System" />
-          <MenuItem icon="information-circle-outline" label="Über BiteWise" />
+          <MenuItem icon="information-circle-outline" label="Ueber BiteWise" />
         </View>
 
         {/* Logout */}

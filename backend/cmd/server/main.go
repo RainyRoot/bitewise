@@ -61,6 +61,10 @@ func main() {
 	trackingRepo := repository.NewSQLiteTrackingRepository(db)
 	shoppingRepo := repository.NewSQLiteShoppingListRepository(db)
 	pantryRepo := repository.NewSQLitePantryRepository(db)
+	achievementRepo := repository.NewSQLiteAchievementRepository(db)
+	sharingRepo := repository.NewSQLiteSharingRepository(db)
+	notifRepo := repository.NewSQLiteNotificationRepository(db)
+	statsRepo := repository.NewSQLiteStatsRepository(db)
 
 	// External providers
 	nutritionProvider := nutrition.NewOpenFoodFactsProvider()
@@ -73,6 +77,10 @@ func main() {
 	trackingSvc := service.NewTrackingService(trackingRepo)
 	shoppingSvc := service.NewShoppingService(shoppingRepo, planRepo)
 	pantrySvc := service.NewPantryService(pantryRepo, recipeRepo)
+	achievementSvc := service.NewAchievementService(achievementRepo)
+	sharingSvc := service.NewSharingService(sharingRepo, recipeRepo)
+	notifSvc := service.NewNotificationService(notifRepo)
+	statsSvc := service.NewStatsService(statsRepo)
 
 	// Handlers
 	authH := handler.NewAuthHandler(authSvc)
@@ -83,6 +91,10 @@ func main() {
 	shoppingH := handler.NewShoppingHandler(shoppingSvc)
 	pantryH := handler.NewPantryHandler(pantrySvc)
 	nutritionH := handler.NewNutritionHandler(nutritionProvider)
+	achievementH := handler.NewAchievementHandler(achievementSvc)
+	sharingH := handler.NewSharingHandler(sharingSvc)
+	notifH := handler.NewNotificationHandler(notifSvc)
+	statsH := handler.NewStatsHandler(statsSvc)
 
 	r := chi.NewRouter()
 
@@ -122,6 +134,9 @@ func main() {
 		// Seasonal calendar (public)
 		r.Get("/seasonal", nutritionH.GetSeasonal)
 
+		// Shared recipes (public view)
+		r.Get("/shared/{code}", sharingH.GetSharedRecipe)
+
 		// Protected routes
 		r.Group(func(r chi.Router) {
 			r.Use(handler.AuthMiddleware(authSvc))
@@ -139,11 +154,18 @@ func main() {
 			// Recipes
 			r.Route("/recipes", func(r chi.Router) {
 				r.Get("/", recipeH.Search)
+				r.Post("/", recipeH.CreateRecipe)
 				r.Get("/favorites", recipeH.GetFavorites)
+				r.Get("/mine", recipeH.GetMyRecipes)
 				r.Get("/{id}", recipeH.GetByID)
+				r.Delete("/{id}", recipeH.DeleteRecipe)
 				r.Post("/{id}/favorite", recipeH.AddFavorite)
 				r.Delete("/{id}/favorite", recipeH.RemoveFavorite)
+				r.Post("/{id}/share", sharingH.ShareRecipe)
 			})
+
+			// Shared recipe import
+			r.Post("/shared/{code}/save", sharingH.SaveSharedRecipe)
 
 			// Meal plans
 			r.Route("/meal-plans", func(r chi.Router) {
@@ -178,10 +200,23 @@ func main() {
 				r.Get("/recipes", pantryH.FindRecipes)
 			})
 
-			// Achievements (Phase 3)
+			// Achievements
 			r.Route("/achievements", func(r chi.Router) {
-				r.Get("/", placeholder("list achievements"))
-				r.Get("/mine", placeholder("list my achievements"))
+				r.Get("/", achievementH.GetAll)
+				r.Get("/mine", achievementH.GetMine)
+			})
+
+			// Notifications
+			r.Route("/notifications", func(r chi.Router) {
+				r.Get("/", notifH.GetSettings)
+				r.Put("/", notifH.UpdateSettings)
+			})
+
+			// Statistics
+			r.Route("/stats", func(r chi.Router) {
+				r.Get("/weekly", statsH.GetWeeklyStats)
+				r.Get("/monthly", statsH.GetMonthlyStats)
+				r.Get("/streaks", statsH.GetStreaks)
 			})
 		})
 	})
@@ -217,14 +252,6 @@ func main() {
 	}
 
 	log.Println("server stopped")
-}
-
-func placeholder(name string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		httputil.JSON(w, http.StatusNotImplemented, map[string]string{
-			"message": fmt.Sprintf("%s: not yet implemented", name),
-		})
-	}
 }
 
 func runMigrations(db *sql.DB) error {

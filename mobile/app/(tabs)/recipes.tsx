@@ -99,6 +99,15 @@ export default function RecipesScreen() {
           ))}
         </ScrollView>
 
+        {/* Create Recipe Button */}
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => router.push('/create-recipe')}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#fff" />
+          <Text style={styles.createButtonText}>Rezept erstellen</Text>
+        </TouchableOpacity>
+
         <Text style={styles.resultCount}>{total} Rezepte</Text>
 
         {loading ? (
@@ -179,4 +188,6 @@ const styles = StyleSheet.create({
   tag: { backgroundColor: '#E8F5E9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
   tagText: { fontSize: 11, color: PRIMARY, fontWeight: '500' },
   favoriteButton: { padding: 12, justifyContent: 'center' },
+  createButton: { flexDirection: 'row', backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 12, justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 12 },
+  createButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });
