@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"sort"
 	"syscall"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 
 	"github.com/rainyroot/bitewise/backend/internal/config"
 	"github.com/rainyroot/bitewise/backend/internal/handler"
+	"github.com/rainyroot/bitewise/backend/internal/nutrition"
 	"github.com/rainyroot/bitewise/backend/internal/repository"
 	"github.com/rainyroot/bitewise/backend/internal/service"
 	"github.com/rainyroot/bitewise/backend/pkg/httputil"
@@ -56,6 +59,11 @@ func main() {
 	recipeRepo := repository.NewSQLiteRecipeRepository(db)
 	planRepo := repository.NewSQLiteMealPlanRepository(db)
 	trackingRepo := repository.NewSQLiteTrackingRepository(db)
+	shoppingRepo := repository.NewSQLiteShoppingListRepository(db)
+	pantryRepo := repository.NewSQLitePantryRepository(db)
+
+	// External providers
+	nutritionProvider := nutrition.NewOpenFoodFactsProvider()
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
@@ -63,6 +71,8 @@ func main() {
 	recipeSvc := service.NewRecipeService(recipeRepo)
 	planSvc := service.NewMealPlanService(planRepo, recipeRepo, userRepo)
 	trackingSvc := service.NewTrackingService(trackingRepo)
+	shoppingSvc := service.NewShoppingService(shoppingRepo, planRepo)
+	pantrySvc := service.NewPantryService(pantryRepo, recipeRepo)
 
 	// Handlers
 	authH := handler.NewAuthHandler(authSvc)
@@ -70,6 +80,9 @@ func main() {
 	recipeH := handler.NewRecipeHandler(recipeSvc)
 	planH := handler.NewMealPlanHandler(planSvc)
 	trackingH := handler.NewTrackingHandler(trackingSvc)
+	shoppingH := handler.NewShoppingHandler(shoppingSvc)
+	pantryH := handler.NewPantryHandler(pantrySvc)
+	nutritionH := handler.NewNutritionHandler(nutritionProvider)
 
 	r := chi.NewRouter()
 
@@ -99,6 +112,15 @@ func main() {
 			r.Post("/register", authH.Register)
 			r.Post("/login", authH.Login)
 		})
+
+		// Nutrition lookup (public)
+		r.Route("/nutrition", func(r chi.Router) {
+			r.Get("/barcode/{code}", nutritionH.LookupBarcode)
+			r.Get("/search", nutritionH.SearchFood)
+		})
+
+		// Seasonal calendar (public)
+		r.Get("/seasonal", nutritionH.GetSeasonal)
 
 		// Protected routes
 		r.Group(func(r chi.Router) {
@@ -142,11 +164,18 @@ func main() {
 				r.Get("/summary", trackingH.GetNutritionSummary)
 			})
 
-			// Shopping lists (Phase 2)
+			// Shopping lists
 			r.Route("/shopping-lists", func(r chi.Router) {
-				r.Post("/", placeholder("create shopping list"))
-				r.Get("/current", placeholder("get current shopping list"))
-				r.Patch("/items/{id}", placeholder("toggle shopping item"))
+				r.Post("/", shoppingH.GenerateFromMealPlan)
+				r.Get("/current", shoppingH.GetCurrent)
+				r.Patch("/items/{id}", shoppingH.ToggleItem)
+			})
+
+			// Pantry / leftover recipes
+			r.Route("/pantry", func(r chi.Router) {
+				r.Post("/", pantryH.SetItems)
+				r.Get("/", pantryH.GetItems)
+				r.Get("/recipes", pantryH.FindRecipes)
 			})
 
 			// Achievements (Phase 3)
@@ -199,13 +228,23 @@ func placeholder(name string) http.HandlerFunc {
 }
 
 func runMigrations(db *sql.DB) error {
-	migration, err := os.ReadFile("migrations/001_initial.sql")
+	files, err := filepath.Glob("migrations/*.sql")
 	if err != nil {
-		return fmt.Errorf("reading migration file: %w", err)
+		return fmt.Errorf("finding migration files: %w", err)
 	}
 
-	if _, err := db.Exec(string(migration)); err != nil {
-		return fmt.Errorf("executing migration: %w", err)
+	sort.Strings(files)
+
+	for _, file := range files {
+		migration, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", file, err)
+		}
+
+		if _, err := db.Exec(string(migration)); err != nil {
+			return fmt.Errorf("executing %s: %w", file, err)
+		}
+		log.Printf("applied migration: %s", file)
 	}
 
 	return nil

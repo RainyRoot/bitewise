@@ -37,6 +37,12 @@ export default function RootLayout() {
             title: 'Rezept',
           }}
         />
+        <Stack.Screen
+          name="scanner"
+          options={{
+            title: 'Barcode Scanner',
+          }}
+        />
       </Stack>
     </AuthProvider>
   );

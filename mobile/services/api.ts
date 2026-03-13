@@ -1,15 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   AuthResponse,
+  FoodItem,
   FoodLog,
   FoodLogRequest,
   LoginRequest,
   MealPlan,
   MealPlanEntry,
   NutritionSummary,
+  PantryItem,
+  PantryMatch,
   Recipe,
   RecipeFilter,
   RegisterRequest,
+  SeasonalResponse,
+  ShoppingList,
   User,
   WaterLog,
   WaterLogRequest,
@@ -57,7 +62,7 @@ const request = async <T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    throw new Error(error.message || error.error || `HTTP ${response.status}`);
   }
 
   if (response.status === 204) {
@@ -70,7 +75,7 @@ const request = async <T>(
 // Auth
 export const auth = {
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
-    const res = await request<AuthResponse>('/api/auth/register', {
+    const res = await request<AuthResponse>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -79,7 +84,7 @@ export const auth = {
   },
 
   login: async (data: LoginRequest): Promise<AuthResponse> => {
-    const res = await request<AuthResponse>('/api/auth/login', {
+    const res = await request<AuthResponse>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -88,7 +93,7 @@ export const auth = {
   },
 
   getMe: async (): Promise<User> => {
-    return request<User>('/api/auth/me');
+    return request<User>('/api/v1/profile');
   },
 
   logout: async (): Promise<void> => {
@@ -99,25 +104,30 @@ export const auth = {
 // Profile
 export const profile = {
   getProfile: async (): Promise<User> => {
-    return request<User>('/api/profile');
+    return request<User>('/api/v1/profile');
   },
 
   updateProfile: async (data: Partial<User>): Promise<User> => {
-    return request<User>('/api/profile', {
+    return request<User>('/api/v1/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   },
 
+  getAllergies: async (): Promise<string[]> => {
+    const res = await request<{ allergen: string }[]>('/api/v1/profile/allergies');
+    return (res || []).map((a) => a.allergen);
+  },
+
   updateAllergies: async (allergies: string[]): Promise<void> => {
-    return request<void>('/api/profile/allergies', {
+    return request<void>('/api/v1/profile/allergies', {
       method: 'PUT',
       body: JSON.stringify({ allergies }),
     });
   },
 
   updatePreferences: async (preferences: Record<string, string>): Promise<void> => {
-    return request<void>('/api/profile/preferences', {
+    return request<void>('/api/v1/profile/preferences', {
       method: 'PUT',
       body: JSON.stringify(preferences),
     });
@@ -126,32 +136,33 @@ export const profile = {
 
 // Recipes
 export const recipes = {
-  list: async (filter?: RecipeFilter): Promise<Recipe[]> => {
+  list: async (filter?: RecipeFilter): Promise<{ recipes: Recipe[]; total: number }> => {
     const params = new URLSearchParams();
-    if (filter?.query) params.set('query', filter.query);
+    if (filter?.query) params.set('q', filter.query);
     if (filter?.category) params.set('category', filter.category);
-    if (filter?.cuisine) params.set('cuisine', filter.cuisine);
-    if (filter?.max_calories) params.set('max_calories', String(filter.max_calories));
     if (filter?.max_prep_time) params.set('max_prep_time', String(filter.max_prep_time));
-    if (filter?.tags) params.set('tags', filter.tags.join(','));
-    if (filter?.page) params.set('page', String(filter.page));
     if (filter?.limit) params.set('limit', String(filter.limit));
+    if (filter?.page) params.set('offset', String(((filter.page || 1) - 1) * (filter.limit || 20)));
     const qs = params.toString();
-    return request<Recipe[]>(`/api/recipes${qs ? `?${qs}` : ''}`);
+    return request<{ recipes: Recipe[]; total: number }>(`/api/v1/recipes${qs ? `?${qs}` : ''}`);
   },
 
   getById: async (id: number): Promise<Recipe> => {
-    return request<Recipe>(`/api/recipes/${id}`);
+    return request<Recipe>(`/api/v1/recipes/${id}`);
+  },
+
+  getFavorites: async (): Promise<Recipe[]> => {
+    return request<Recipe[]>('/api/v1/recipes/favorites');
   },
 
   addFavorite: async (recipeId: number): Promise<void> => {
-    return request<void>(`/api/recipes/${recipeId}/favorite`, {
+    return request<void>(`/api/v1/recipes/${recipeId}/favorite`, {
       method: 'POST',
     });
   },
 
   removeFavorite: async (recipeId: number): Promise<void> => {
-    return request<void>(`/api/recipes/${recipeId}/favorite`, {
+    return request<void>(`/api/v1/recipes/${recipeId}/favorite`, {
       method: 'DELETE',
     });
   },
@@ -159,36 +170,30 @@ export const recipes = {
 
 // Meal Plans
 export const mealPlans = {
-  generate: async (): Promise<MealPlan> => {
-    return request<MealPlan>('/api/meal-plans/generate', {
+  generate: async (weekStartDate?: string): Promise<MealPlan> => {
+    return request<MealPlan>('/api/v1/meal-plans/generate', {
       method: 'POST',
+      body: JSON.stringify({ week_start_date: weekStartDate || '' }),
     });
   },
 
   getCurrent: async (): Promise<MealPlan> => {
-    return request<MealPlan>('/api/meal-plans/current');
+    return request<MealPlan>('/api/v1/meal-plans/current');
   },
 
   getById: async (id: number): Promise<MealPlan> => {
-    return request<MealPlan>(`/api/meal-plans/${id}`);
+    return request<MealPlan>(`/api/v1/meal-plans/${id}`);
   },
 
   updateEntry: async (planId: number, entryId: number, data: Partial<MealPlanEntry>): Promise<MealPlanEntry> => {
-    return request<MealPlanEntry>(`/api/meal-plans/${planId}/entries/${entryId}`, {
-      method: 'PUT',
+    return request<MealPlanEntry>(`/api/v1/meal-plans/${planId}/entries/${entryId}`, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
 
-  lockEntry: async (planId: number, entryId: number, locked: boolean): Promise<MealPlanEntry> => {
-    return request<MealPlanEntry>(`/api/meal-plans/${planId}/entries/${entryId}/lock`, {
-      method: 'PUT',
-      body: JSON.stringify({ locked }),
-    });
-  },
-
-  regenerate: async (planId: number): Promise<MealPlan> => {
-    return request<MealPlan>(`/api/meal-plans/${planId}/regenerate`, {
+  activate: async (planId: number): Promise<void> => {
+    return request<void>(`/api/v1/meal-plans/${planId}/activate`, {
       method: 'POST',
     });
   },
@@ -197,42 +202,94 @@ export const mealPlans = {
 // Food Tracking
 export const tracking = {
   logFood: async (data: FoodLogRequest): Promise<FoodLog> => {
-    return request<FoodLog>('/api/tracking/food', {
+    return request<FoodLog>('/api/v1/tracking/food', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   getFoodLogs: async (date: string): Promise<FoodLog[]> => {
-    return request<FoodLog[]>(`/api/tracking/food?date=${date}`);
+    return request<FoodLog[]>(`/api/v1/tracking/food?date=${date}`);
   },
 
   deleteFood: async (id: number): Promise<void> => {
-    return request<void>(`/api/tracking/food/${id}`, {
+    return request<void>(`/api/v1/tracking/food/${id}`, {
       method: 'DELETE',
     });
   },
 
   getSummary: async (date: string): Promise<NutritionSummary> => {
-    return request<NutritionSummary>(`/api/tracking/summary?date=${date}`);
+    return request<NutritionSummary>(`/api/v1/tracking/summary?date=${date}`);
   },
 };
 
 // Water Tracking
 export const water = {
   logWater: async (data: WaterLogRequest): Promise<WaterLog> => {
-    return request<WaterLog>('/api/tracking/water', {
+    return request<WaterLog>('/api/v1/tracking/water', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   getWaterLogs: async (date: string): Promise<WaterLog[]> => {
-    return request<WaterLog[]>(`/api/tracking/water?date=${date}`);
+    return request<WaterLog[]>(`/api/v1/tracking/water?date=${date}`);
+  },
+};
+
+// Nutrition (Barcode / Food Search)
+export const nutritionLookup = {
+  lookupBarcode: async (code: string): Promise<FoodItem> => {
+    return request<FoodItem>(`/api/v1/nutrition/barcode/${code}`);
   },
 
-  getWaterSummary: async (date: string): Promise<{ total_ml: number; target_ml: number }> => {
-    return request<{ total_ml: number; target_ml: number }>(`/api/tracking/water/summary?date=${date}`);
+  searchFood: async (query: string): Promise<FoodItem[]> => {
+    return request<FoodItem[]>(`/api/v1/nutrition/search?q=${encodeURIComponent(query)}`);
+  },
+};
+
+// Shopping Lists
+export const shoppingLists = {
+  generate: async (mealPlanId: number): Promise<ShoppingList> => {
+    return request<ShoppingList>('/api/v1/shopping-lists', {
+      method: 'POST',
+      body: JSON.stringify({ meal_plan_id: mealPlanId }),
+    });
+  },
+
+  getCurrent: async (): Promise<ShoppingList> => {
+    return request<ShoppingList>('/api/v1/shopping-lists/current');
+  },
+
+  toggleItem: async (itemId: number): Promise<void> => {
+    return request<void>(`/api/v1/shopping-lists/items/${itemId}`, {
+      method: 'PATCH',
+    });
+  },
+};
+
+// Pantry
+export const pantry = {
+  setItems: async (items: string[]): Promise<PantryItem[]> => {
+    return request<PantryItem[]>('/api/v1/pantry', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  },
+
+  getItems: async (): Promise<PantryItem[]> => {
+    return request<PantryItem[]>('/api/v1/pantry');
+  },
+
+  findRecipes: async (): Promise<PantryMatch[]> => {
+    return request<PantryMatch[]>('/api/v1/pantry/recipes');
+  },
+};
+
+// Seasonal
+export const seasonal = {
+  getCurrent: async (): Promise<SeasonalResponse> => {
+    return request<SeasonalResponse>('/api/v1/seasonal');
   },
 };
 
@@ -243,6 +300,10 @@ export const api = {
   mealPlans,
   tracking,
   water,
+  nutritionLookup,
+  shoppingLists,
+  pantry,
+  seasonal,
 };
 
 export default api;

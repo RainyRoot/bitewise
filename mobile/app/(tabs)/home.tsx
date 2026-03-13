@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,57 +6,101 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
+import { tracking, water } from '@/services/api';
+import type { NutritionSummary, FoodLog } from '@/types';
 
 const PRIMARY = '#4CAF50';
 const BACKGROUND = '#F5F5F5';
 
-// TODO: Replace with actual user data from API
-const PLACEHOLDER_USER = 'Max';
-const CALORIE_TARGET = 2200;
-const CALORIES_CONSUMED = 1450;
-
-// TODO: Replace with actual water data from API
-const WATER_TARGET = 2500;
-
-interface MealSummary {
-  type: string;
-  name: string;
-  calories: number;
-}
-
-// TODO: Replace with actual meal data from API
-const PLACEHOLDER_MEALS: MealSummary[] = [
-  { type: 'Frühstück', name: 'Haferflocken mit Beeren', calories: 350 },
-  { type: 'Mittagessen', name: 'Hähnchensalat', calories: 520 },
-  { type: 'Snack', name: 'Apfel & Mandeln', calories: 180 },
-];
+const MEAL_LABELS: Record<string, string> = {
+  breakfast: 'Frühstück',
+  lunch: 'Mittagessen',
+  dinner: 'Abendessen',
+  snack: 'Snack',
+};
 
 export default function HomeScreen() {
-  // TODO: Fetch water logs from API and calculate total
-  const [waterConsumed, setWaterConsumed] = useState(1200);
+  const { user } = useAuth();
+  const [summary, setSummary] = useState<NutritionSummary | null>(null);
+  const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
+  const [waterTotal, setWaterTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const caloriePercent = Math.round((CALORIES_CONSUMED / CALORIE_TARGET) * 100);
-  const waterPercent = Math.round((waterConsumed / WATER_TARGET) * 100);
+  const calorieTarget = user?.calorie_target || 2200;
+  const waterTarget = user?.daily_water_ml_goal || 2500;
+  const today = new Date().toISOString().split('T')[0];
 
-  const addWater = (amount: number) => {
-    // TODO: Call api.water.logWater({ amount_ml: amount })
-    setWaterConsumed((prev) => Math.min(prev + amount, WATER_TARGET + 1000));
+  const fetchData = async () => {
+    try {
+      const [summaryData, logs, waterLogs] = await Promise.all([
+        tracking.getSummary(today).catch(() => null),
+        tracking.getFoodLogs(today).catch(() => []),
+        water.getWaterLogs(today).catch(() => []),
+      ]);
+      setSummary(summaryData);
+      setFoodLogs(logs || []);
+      const totalWater = (waterLogs || []).reduce((sum, w) => sum + w.amount_ml, 0);
+      setWaterTotal(totalWater);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
+
+  const addWater = async (amount: number) => {
+    try {
+      await water.logWater({ date: today, amount_ml: amount });
+      setWaterTotal((prev) => prev + amount);
+    } catch {
+      // ignore
+    }
+  };
+
+  const caloriesConsumed = summary?.calories || 0;
+  const caloriePercent = calorieTarget > 0 ? Math.round((caloriesConsumed / calorieTarget) * 100) : 0;
+  const waterPercent = waterTarget > 0 ? Math.round((waterTotal / waterTarget) * 100) : 0;
+  const proteinG = summary?.protein_g || 0;
+  const carbsG = summary?.carbs_g || 0;
+  const fatG = summary?.fat_g || 0;
+
+  // Group food logs by meal type
+  const mealGroups = foodLogs.reduce<Record<string, FoodLog[]>>((groups, log) => {
+    if (!groups[log.meal_type]) groups[log.meal_type] = [];
+    groups[log.meal_type].push(log);
+    return groups;
+  }, {});
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 48 }} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Greeting */}
-        <Text style={styles.greeting}>Hallo, {PLACEHOLDER_USER}!</Text>
+        <Text style={styles.greeting}>Hallo, {user?.name || 'User'}!</Text>
         <Text style={styles.subtitle}>Dein heutiger Überblick</Text>
 
         {/* Calorie Progress */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Kalorien</Text>
           <View style={styles.calorieCircle}>
-            <Text style={styles.calorieNumber}>{CALORIES_CONSUMED}</Text>
-            <Text style={styles.calorieLabel}>von {CALORIE_TARGET} kcal</Text>
+            <Text style={styles.calorieNumber}>{caloriesConsumed}</Text>
+            <Text style={styles.calorieLabel}>von {calorieTarget} kcal</Text>
             <Text style={styles.caloriePercent}>{caloriePercent}%</Text>
           </View>
           <View style={styles.progressBarBackground}>
@@ -69,15 +113,15 @@ export default function HomeScreen() {
           </View>
           <View style={styles.macroRow}>
             <View style={styles.macroItem}>
-              <Text style={styles.macroValue}>85g</Text>
+              <Text style={styles.macroValue}>{Math.round(proteinG)}g</Text>
               <Text style={styles.macroLabel}>Protein</Text>
             </View>
             <View style={styles.macroItem}>
-              <Text style={styles.macroValue}>165g</Text>
+              <Text style={styles.macroValue}>{Math.round(carbsG)}g</Text>
               <Text style={styles.macroLabel}>Kohlenhydrate</Text>
             </View>
             <View style={styles.macroItem}>
-              <Text style={styles.macroValue}>48g</Text>
+              <Text style={styles.macroValue}>{Math.round(fatG)}g</Text>
               <Text style={styles.macroLabel}>Fett</Text>
             </View>
           </View>
@@ -87,7 +131,7 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Wasser</Text>
           <Text style={styles.waterText}>
-            {waterConsumed} / {WATER_TARGET} ml ({waterPercent}%)
+            {waterTotal} / {waterTarget} ml ({waterPercent}%)
           </Text>
           <View style={styles.progressBarBackground}>
             <View
@@ -101,22 +145,13 @@ export default function HomeScreen() {
             />
           </View>
           <View style={styles.waterButtons}>
-            <TouchableOpacity
-              style={styles.waterButton}
-              onPress={() => addWater(100)}
-            >
+            <TouchableOpacity style={styles.waterButton} onPress={() => addWater(100)}>
               <Text style={styles.waterButtonText}>+100ml</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.waterButton}
-              onPress={() => addWater(250)}
-            >
+            <TouchableOpacity style={styles.waterButton} onPress={() => addWater(250)}>
               <Text style={styles.waterButtonText}>+250ml</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.waterButton}
-              onPress={() => addWater(500)}
-            >
+            <TouchableOpacity style={styles.waterButton} onPress={() => addWater(500)}>
               <Text style={styles.waterButtonText}>+500ml</Text>
             </TouchableOpacity>
           </View>
@@ -125,25 +160,25 @@ export default function HomeScreen() {
         {/* Today's Meals */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Heutige Mahlzeiten</Text>
-          {PLACEHOLDER_MEALS.map((meal, index) => (
-            <View key={index} style={styles.mealRow}>
-              <View>
-                <Text style={styles.mealType}>{meal.type}</Text>
-                <Text style={styles.mealName}>{meal.name}</Text>
+          {['breakfast', 'lunch', 'dinner', 'snack'].map((mealType) => {
+            const logs = mealGroups[mealType] || [];
+            const totalCals = logs.reduce((s, l) => s + l.calories, 0);
+            return (
+              <View key={mealType} style={styles.mealRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mealType}>{MEAL_LABELS[mealType]}</Text>
+                  <Text style={[styles.mealName, logs.length === 0 && { color: '#999' }]}>
+                    {logs.length > 0
+                      ? logs.map((l) => l.food_name).join(', ')
+                      : 'Noch nicht erfasst'}
+                  </Text>
+                </View>
+                <Text style={[styles.mealCalories, logs.length === 0 && { color: '#999' }]}>
+                  {logs.length > 0 ? `${totalCals} kcal` : '-- kcal'}
+                </Text>
               </View>
-              <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
-            </View>
-          ))}
-          {/* TODO: Add "Abendessen" entry when logged */}
-          <View style={styles.mealRow}>
-            <View>
-              <Text style={styles.mealType}>Abendessen</Text>
-              <Text style={[styles.mealName, { color: '#999' }]}>
-                Noch nicht erfasst
-              </Text>
-            </View>
-            <Text style={[styles.mealCalories, { color: '#999' }]}>-- kcal</Text>
-          </View>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -151,143 +186,28 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BACKGROUND,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#212121',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#757575',
-    marginBottom: 20,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212121',
-    marginBottom: 12,
-  },
-  calorieCircle: {
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingVertical: 20,
-    borderWidth: 6,
-    borderColor: PRIMARY,
-    borderRadius: 100,
-    width: 180,
-    height: 180,
-    justifyContent: 'center',
-    alignSelf: 'center',
-  },
-  calorieNumber: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: PRIMARY,
-  },
-  calorieLabel: {
-    fontSize: 14,
-    color: '#757575',
-    marginTop: 2,
-  },
-  caloriePercent: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: PRIMARY,
-    marginTop: 4,
-  },
-  progressBarBackground: {
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: PRIMARY,
-    borderRadius: 4,
-  },
-  macroRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  macroItem: {
-    alignItems: 'center',
-  },
-  macroValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212121',
-  },
-  macroLabel: {
-    fontSize: 12,
-    color: '#757575',
-    marginTop: 2,
-  },
-  waterText: {
-    fontSize: 16,
-    color: '#2196F3',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  waterButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
-  },
-  waterButton: {
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  waterButtonText: {
-    color: '#2196F3',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  mealRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  mealType: {
-    fontSize: 12,
-    color: '#757575',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  mealName: {
-    fontSize: 16,
-    color: '#212121',
-    marginTop: 2,
-  },
-  mealCalories: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: PRIMARY,
-  },
+  container: { flex: 1, backgroundColor: BACKGROUND },
+  scrollContent: { padding: 16, paddingBottom: 32 },
+  greeting: { fontSize: 28, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
+  subtitle: { fontSize: 16, color: '#757575', marginBottom: 20 },
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 },
+  cardTitle: { fontSize: 18, fontWeight: '600', color: '#212121', marginBottom: 12 },
+  calorieCircle: { alignItems: 'center', marginBottom: 16, paddingVertical: 20, borderWidth: 6, borderColor: PRIMARY, borderRadius: 100, width: 180, height: 180, justifyContent: 'center', alignSelf: 'center' },
+  calorieNumber: { fontSize: 36, fontWeight: 'bold', color: PRIMARY },
+  calorieLabel: { fontSize: 14, color: '#757575', marginTop: 2 },
+  caloriePercent: { fontSize: 16, fontWeight: '600', color: PRIMARY, marginTop: 4 },
+  progressBarBackground: { height: 8, backgroundColor: '#E0E0E0', borderRadius: 4, overflow: 'hidden', marginBottom: 12 },
+  progressBarFill: { height: '100%', backgroundColor: PRIMARY, borderRadius: 4 },
+  macroRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  macroItem: { alignItems: 'center' },
+  macroValue: { fontSize: 18, fontWeight: '600', color: '#212121' },
+  macroLabel: { fontSize: 12, color: '#757575', marginTop: 2 },
+  waterText: { fontSize: 16, color: '#2196F3', marginBottom: 8, fontWeight: '500' },
+  waterButtons: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
+  waterButton: { backgroundColor: '#E3F2FD', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
+  waterButtonText: { color: '#2196F3', fontWeight: '600', fontSize: 14 },
+  mealRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  mealType: { fontSize: 12, color: '#757575', textTransform: 'uppercase', letterSpacing: 0.5 },
+  mealName: { fontSize: 16, color: '#212121', marginTop: 2 },
+  mealCalories: { fontSize: 16, fontWeight: '600', color: PRIMARY },
 });

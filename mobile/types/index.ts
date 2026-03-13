@@ -10,6 +10,7 @@ export interface User {
   activity_level?: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
   goal?: 'lose' | 'maintain' | 'gain';
   calorie_target?: number;
+  daily_water_ml_goal?: number;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +36,7 @@ export interface Ingredient {
   id: number;
   name: string;
   amount: number;
+  quantity?: number;
   unit: string;
   calories: number;
   protein_g: number;
@@ -51,15 +53,22 @@ export interface Recipe {
   cook_time_min: number;
   servings: number;
   calories: number;
+  calories_per_serving?: number;
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  fiber_g?: number;
+  difficulty?: string;
   category: string;
   cuisine: string;
   tags: string[];
+  allergens?: string[];
+  categories?: string[];
   ingredients: Ingredient[];
   instructions: string[];
   is_favorite?: boolean;
+  source_url?: string;
+  source_site?: string;
   created_at: string;
 }
 
@@ -80,16 +89,17 @@ export interface MealPlanEntry {
   meal_plan_id: number;
   recipe_id: number;
   recipe?: Recipe;
-  day: string;
+  day_of_week: number;
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  locked: boolean;
+  servings: number;
+  is_locked: boolean;
 }
 
 export interface MealPlan {
   id: number;
   user_id: number;
-  week_start: string;
-  week_end: string;
+  week_start_date: string;
+  status: string;
   entries: MealPlanEntry[];
   created_at: string;
 }
@@ -98,60 +108,111 @@ export interface MealPlan {
 export interface FoodLog {
   id: number;
   user_id: number;
-  recipe_id?: number;
-  recipe?: Recipe;
-  name: string;
+  date: string;
+  food_name: string;
+  barcode?: string;
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  servings: number;
   calories: number;
   protein_g: number;
   carbs_g: number;
   fat_g: number;
-  amount: number;
-  unit: string;
-  logged_at: string;
+  fiber_g?: number;
+  created_at?: string;
 }
 
 export interface FoodLogRequest {
-  recipe_id?: number;
-  name: string;
+  date?: string;
+  food_name: string;
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  barcode?: string;
+  servings?: number;
   calories: number;
   protein_g: number;
   carbs_g: number;
   fat_g: number;
-  amount: number;
-  unit: string;
-  logged_at?: string;
+  fiber_g?: number;
 }
 
 export interface WaterLog {
   id: number;
   user_id: number;
+  date?: string;
   amount_ml: number;
   logged_at: string;
 }
 
 export interface WaterLogRequest {
+  date?: string;
   amount_ml: number;
-  logged_at?: string;
 }
 
 export interface NutritionSummary {
   date: string;
-  total_calories: number;
-  total_protein_g: number;
-  total_carbs_g: number;
-  total_fat_g: number;
-  calorie_target: number;
-  protein_target_g: number;
-  carbs_target_g: number;
-  fat_target_g: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g?: number;
   water_ml: number;
-  water_target_ml: number;
-  meals: {
-    breakfast: FoodLog[];
-    lunch: FoodLog[];
-    dinner: FoodLog[];
-    snack: FoodLog[];
-  };
+  meal_count: number;
+}
+
+// Nutrition / Barcode types
+export interface FoodItem {
+  barcode: string;
+  name: string;
+  brand?: string;
+  image_url?: string;
+  calories_per_100g: number;
+  protein_g_per_100g: number;
+  carbs_g_per_100g: number;
+  fat_g_per_100g: number;
+  fiber_g_per_100g: number;
+  serving_size?: string;
+}
+
+// Shopping List types
+export interface ShoppingListItem {
+  id: number;
+  shopping_list_id: number;
+  ingredient_name: string;
+  quantity: number;
+  unit: string;
+  category: string;
+  is_checked: boolean;
+}
+
+export interface ShoppingList {
+  id: number;
+  user_id: number;
+  meal_plan_id: number;
+  items: ShoppingListItem[];
+  created_at: string;
+}
+
+// Pantry types
+export interface PantryItem {
+  id: number;
+  user_id: number;
+  name: string;
+  created_at: string;
+}
+
+export interface PantryMatch {
+  recipe: Recipe;
+  matched_count: number;
+  total_count: number;
+  match_percent: number;
+}
+
+// Seasonal types
+export interface SeasonalItem {
+  name: string;
+  category: string;
+}
+
+export interface SeasonalResponse {
+  month: string;
+  items: SeasonalItem[];
 }
