@@ -18,6 +18,9 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/rainyroot/bitewise/backend/internal/config"
+	"github.com/rainyroot/bitewise/backend/internal/handler"
+	"github.com/rainyroot/bitewise/backend/internal/repository"
+	"github.com/rainyroot/bitewise/backend/internal/service"
 	"github.com/rainyroot/bitewise/backend/pkg/httputil"
 )
 
@@ -48,6 +51,26 @@ func main() {
 		return
 	}
 
+	// Repositories
+	userRepo := repository.NewSQLiteUserRepository(db)
+	recipeRepo := repository.NewSQLiteRecipeRepository(db)
+	planRepo := repository.NewSQLiteMealPlanRepository(db)
+	trackingRepo := repository.NewSQLiteTrackingRepository(db)
+
+	// Services
+	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
+	profileSvc := service.NewProfileService(userRepo)
+	recipeSvc := service.NewRecipeService(recipeRepo)
+	planSvc := service.NewMealPlanService(planRepo, recipeRepo, userRepo)
+	trackingSvc := service.NewTrackingService(trackingRepo)
+
+	// Handlers
+	authH := handler.NewAuthHandler(authSvc)
+	profileH := handler.NewProfileHandler(profileSvc)
+	recipeH := handler.NewRecipeHandler(recipeSvc)
+	planH := handler.NewMealPlanHandler(planSvc)
+	trackingH := handler.NewTrackingHandler(trackingSvc)
+
 	r := chi.NewRouter()
 
 	// Middleware
@@ -71,60 +94,62 @@ func main() {
 
 	// API routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Auth
+		// Auth (public)
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", placeholder("register"))
-			r.Post("/login", placeholder("login"))
+			r.Post("/register", authH.Register)
+			r.Post("/login", authH.Login)
 		})
 
-		// Protected routes (will add auth middleware later)
+		// Protected routes
 		r.Group(func(r chi.Router) {
+			r.Use(handler.AuthMiddleware(authSvc))
+
 			// User profile
 			r.Route("/profile", func(r chi.Router) {
-				r.Get("/", placeholder("get profile"))
-				r.Put("/", placeholder("update profile"))
-				r.Get("/allergies", placeholder("get allergies"))
-				r.Put("/allergies", placeholder("set allergies"))
-				r.Get("/preferences", placeholder("get preferences"))
-				r.Put("/preferences", placeholder("set preferences"))
+				r.Get("/", profileH.GetProfile)
+				r.Put("/", profileH.UpdateProfile)
+				r.Get("/allergies", profileH.GetAllergies)
+				r.Put("/allergies", profileH.SetAllergies)
+				r.Get("/preferences", profileH.GetPreferences)
+				r.Put("/preferences", profileH.SetPreferences)
 			})
 
 			// Recipes
 			r.Route("/recipes", func(r chi.Router) {
-				r.Get("/", placeholder("search recipes"))
-				r.Get("/{id}", placeholder("get recipe"))
-				r.Post("/{id}/favorite", placeholder("favorite recipe"))
-				r.Delete("/{id}/favorite", placeholder("unfavorite recipe"))
-				r.Get("/favorites", placeholder("list favorites"))
+				r.Get("/", recipeH.Search)
+				r.Get("/favorites", recipeH.GetFavorites)
+				r.Get("/{id}", recipeH.GetByID)
+				r.Post("/{id}/favorite", recipeH.AddFavorite)
+				r.Delete("/{id}/favorite", recipeH.RemoveFavorite)
 			})
 
 			// Meal plans
 			r.Route("/meal-plans", func(r chi.Router) {
-				r.Post("/generate", placeholder("generate meal plan"))
-				r.Get("/current", placeholder("get current meal plan"))
-				r.Get("/{id}", placeholder("get meal plan"))
-				r.Patch("/{id}/entries/{entryId}", placeholder("update meal plan entry"))
-				r.Post("/{id}/activate", placeholder("activate meal plan"))
+				r.Post("/generate", planH.Generate)
+				r.Get("/current", planH.GetCurrent)
+				r.Get("/{id}", planH.GetByID)
+				r.Patch("/{id}/entries/{entryId}", planH.UpdateEntry)
+				r.Post("/{id}/activate", planH.Activate)
 			})
 
 			// Food tracking
 			r.Route("/tracking", func(r chi.Router) {
-				r.Post("/food", placeholder("log food"))
-				r.Get("/food", placeholder("get food logs"))
-				r.Delete("/food/{id}", placeholder("delete food log"))
-				r.Post("/water", placeholder("log water"))
-				r.Get("/water", placeholder("get water logs"))
-				r.Get("/summary", placeholder("get nutrition summary"))
+				r.Post("/food", trackingH.LogFood)
+				r.Get("/food", trackingH.GetFoodLogs)
+				r.Delete("/food/{id}", trackingH.DeleteFoodLog)
+				r.Post("/water", trackingH.LogWater)
+				r.Get("/water", trackingH.GetWaterLogs)
+				r.Get("/summary", trackingH.GetNutritionSummary)
 			})
 
-			// Shopping lists
+			// Shopping lists (Phase 2)
 			r.Route("/shopping-lists", func(r chi.Router) {
 				r.Post("/", placeholder("create shopping list"))
 				r.Get("/current", placeholder("get current shopping list"))
 				r.Patch("/items/{id}", placeholder("toggle shopping item"))
 			})
 
-			// Achievements
+			// Achievements (Phase 3)
 			r.Route("/achievements", func(r chi.Router) {
 				r.Get("/", placeholder("list achievements"))
 				r.Get("/mine", placeholder("list my achievements"))
