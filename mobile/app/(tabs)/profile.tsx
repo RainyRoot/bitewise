@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { profile } from '@/services/api';
+import { useI18n } from '@/i18n';
+import type { Locale } from '@/i18n';
 
 const PRIMARY = '#4CAF50';
 const BACKGROUND = '#F5F5F5';
@@ -39,6 +41,7 @@ function MenuItem({ icon, label, value, onPress }: MenuItemProps) {
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { locale, setLocale, t } = useI18n();
   const [allergies, setAllergies] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -88,7 +91,7 @@ export default function ProfileScreen() {
 
         {/* Allergies */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Allergien & Unverträglichkeiten</Text>
+          <Text style={styles.cardTitle}>{t.allergies}</Text>
           <View style={styles.allergenRow}>
             {allergies.length > 0 ? (
               allergies.map((a) => (
@@ -97,7 +100,7 @@ export default function ProfileScreen() {
                 </View>
               ))
             ) : (
-              <Text style={{ color: '#BDBDBD', fontStyle: 'italic' }}>Keine eingetragen</Text>
+              <Text style={{ color: '#BDBDBD', fontStyle: 'italic' }}>{t.no_allergies}</Text>
             )}
           </View>
         </View>
@@ -124,17 +127,27 @@ export default function ProfileScreen() {
             label="Wasserziel"
             value={user?.daily_water_ml_goal ? `${user.daily_water_ml_goal} ml` : ''}
           />
-          <MenuItem icon="heart-outline" label="Favoriten" />
-          <MenuItem icon="trophy-outline" label="Achievements" onPress={() => router.push('/achievements')} />
-          <MenuItem icon="stats-chart-outline" label="Statistiken" onPress={() => router.push('/stats')} />
-          <MenuItem icon="book-outline" label="Meine Rezepte" onPress={() => router.push('/create-recipe')} />
+          <MenuItem icon="heart-outline" label={t.favorites} />
+          <MenuItem icon="trophy-outline" label={t.achievements} onPress={() => router.push('/achievements')} />
+          <MenuItem icon="stats-chart-outline" label={t.statistics} onPress={() => router.push('/stats')} />
+          <MenuItem icon="book-outline" label={t.my_recipes} onPress={() => router.push('/create-recipe')} />
+          <MenuItem icon="journal-outline" label={t.diary_title} onPress={() => router.push('/diary')} />
+          <MenuItem icon="pricetag-outline" label={t.prices_title} onPress={() => router.push('/price-tracker')} />
+          <MenuItem icon="people-outline" label={t.friends_title} onPress={() => router.push('/friends')} />
         </View>
 
         {/* Settings */}
         <View style={styles.card}>
-          <MenuItem icon="notifications-outline" label="Benachrichtigungen" onPress={() => router.push('/notification-settings')} />
-          <MenuItem icon="moon-outline" label="Erscheinungsbild" value="System" />
-          <MenuItem icon="information-circle-outline" label="Ueber BiteWise" />
+          <MenuItem icon="notifications-outline" label={t.notifications} onPress={() => router.push('/notification-settings')} />
+          <MenuItem
+            icon="language-outline"
+            label="Sprache / Language"
+            value={locale === 'de' ? 'Deutsch' : 'English'}
+            onPress={() => setLocale(locale === 'de' ? 'en' as Locale : 'de' as Locale)}
+          />
+          <MenuItem icon="cloud-download-outline" label={t.export_title} onPress={() => router.push('/data-export')} />
+          <MenuItem icon="moon-outline" label={t.appearance} value="System" />
+          <MenuItem icon="information-circle-outline" label={t.about} />
         </View>
 
         {/* Logout */}

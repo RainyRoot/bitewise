@@ -65,6 +65,9 @@ func main() {
 	sharingRepo := repository.NewSQLiteSharingRepository(db)
 	notifRepo := repository.NewSQLiteNotificationRepository(db)
 	statsRepo := repository.NewSQLiteStatsRepository(db)
+	diaryRepo := repository.NewSQLiteDiaryRepository(db)
+	priceRepo := repository.NewSQLitePriceRepository(db)
+	friendRepo := repository.NewSQLiteFriendRepository(db)
 
 	// External providers
 	nutritionProvider := nutrition.NewOpenFoodFactsProvider()
@@ -81,6 +84,10 @@ func main() {
 	sharingSvc := service.NewSharingService(sharingRepo, recipeRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
 	statsSvc := service.NewStatsService(statsRepo)
+	diarySvc := service.NewDiaryService(diaryRepo)
+	priceSvc := service.NewPriceService(priceRepo)
+	friendSvc := service.NewFriendService(friendRepo, userRepo)
+	exportSvc := service.NewExportService(trackingRepo, userRepo)
 
 	// Handlers
 	authH := handler.NewAuthHandler(authSvc)
@@ -95,6 +102,10 @@ func main() {
 	sharingH := handler.NewSharingHandler(sharingSvc)
 	notifH := handler.NewNotificationHandler(notifSvc)
 	statsH := handler.NewStatsHandler(statsSvc)
+	diaryH := handler.NewDiaryHandler(diarySvc)
+	priceH := handler.NewPriceHandler(priceSvc)
+	friendH := handler.NewFriendHandler(friendSvc)
+	exportH := handler.NewExportHandler(exportSvc)
 
 	r := chi.NewRouter()
 
@@ -218,6 +229,42 @@ func main() {
 				r.Get("/monthly", statsH.GetMonthlyStats)
 				r.Get("/streaks", statsH.GetStreaks)
 			})
+
+			// Diary
+			r.Route("/diary", func(r chi.Router) {
+				r.Post("/", diaryH.CreateOrUpdate)
+				r.Get("/", diaryH.GetByDate)
+				r.Get("/monthly", diaryH.GetMonthly)
+				r.Delete("/{id}", diaryH.Delete)
+			})
+
+			// Prices
+			r.Route("/prices", func(r chi.Router) {
+				r.Post("/", priceH.LogPrice)
+				r.Get("/", priceH.GetLogs)
+				r.Get("/trends", priceH.GetTrend)
+				r.Get("/compare", priceH.CompareStores)
+				r.Get("/spending", priceH.GetSpending)
+			})
+
+			// Friends
+			r.Route("/friends", func(r chi.Router) {
+				r.Post("/invite", friendH.InviteFriend)
+				r.Get("/invites", friendH.GetPendingInvites)
+				r.Post("/invites/{id}", friendH.RespondToInvite)
+				r.Get("/", friendH.GetFriends)
+				r.Delete("/{id}", friendH.RemoveFriend)
+			})
+
+			// Leaderboard
+			r.Get("/leaderboard", friendH.GetLeaderboard)
+
+			// Export & Account
+			r.Route("/export", func(r chi.Router) {
+				r.Get("/csv", exportH.ExportCSV)
+				r.Get("/json", exportH.ExportJSON)
+			})
+			r.Delete("/account", exportH.DeleteAccount)
 		})
 	})
 

@@ -12,6 +12,7 @@ import (
 type TrackingRepository interface {
 	CreateFoodLog(ctx context.Context, log *domain.FoodLog) error
 	GetFoodLogs(ctx context.Context, userID int64, date string) ([]domain.FoodLog, error)
+	GetFoodLogsByUser(ctx context.Context, userID int64) ([]domain.FoodLog, error)
 	DeleteFoodLog(ctx context.Context, id, userID int64) error
 	CreateWaterLog(ctx context.Context, log *domain.WaterLog) error
 	GetWaterLogs(ctx context.Context, userID int64, date string) ([]domain.WaterLog, error)
@@ -72,6 +73,32 @@ func (r *SQLiteTrackingRepository) GetFoodLogs(ctx context.Context, userID int64
 		logs = append(logs, l)
 	}
 
+	return logs, rows.Err()
+}
+
+func (r *SQLiteTrackingRepository) GetFoodLogsByUser(ctx context.Context, userID int64) ([]domain.FoodLog, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, user_id, date, meal_type, food_name, barcode, servings, calories, protein_g, carbs_g, fat_g, fiber_g, created_at
+		 FROM food_logs WHERE user_id = ? ORDER BY date DESC, created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying all food logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []domain.FoodLog
+	for rows.Next() {
+		var l domain.FoodLog
+		if err := rows.Scan(
+			&l.ID, &l.UserID, &l.Date, &l.MealType, &l.FoodName, &l.Barcode,
+			&l.Servings, &l.Calories, &l.ProteinG, &l.CarbsG, &l.FatG,
+			&l.FiberG, &l.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scanning food log: %w", err)
+		}
+		logs = append(logs, l)
+	}
 	return logs, rows.Err()
 }
 

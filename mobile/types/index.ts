@@ -306,3 +306,103 @@ export interface CreateRecipeRequest {
   ingredients?: SimpleIngredient[];
   instructions?: string;
 }
+
+// Diary types
+export interface DiaryEntry {
+  id: number;
+  user_id: number;
+  date: string;
+  mood: 'great' | 'good' | 'neutral' | 'bad' | 'terrible';
+  energy_level: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiaryEntryRequest {
+  date: string;
+  mood: string;
+  energy_level: number;
+  notes: string;
+}
+
+export interface MonthlyMoodSummary {
+  month: string;
+  entries: DiaryEntry[];
+  avg_energy: number;
+  mood_counts: Record<string, number>;
+}
+
+// Price types
+export interface PriceLog {
+  id: number;
+  user_id: number;
+  item_name: string;
+  price_cents: number;
+  currency: string;
+  store: string;
+  date: string;
+  created_at: string;
+}
+
+export interface PriceLogRequest {
+  item_name: string;
+  price_cents: number;
+  currency?: string;
+  store?: string;
+  date?: string;
+}
+
+export interface PriceTrend {
+  item_name: string;
+  points: PriceTrendPoint[];
+}
+
+export interface PriceTrendPoint {
+  date: string;
+  price_cents: number;
+  store: string;
+}
+
+export interface StoreComparison {
+  item_name: string;
+  stores: StorePrice[];
+}
+
+export interface StorePrice {
+  store: string;
+  avg_price_cents: number;
+  last_price_cents: number;
+  entry_count: number;
+}
+
+export interface SpendingSummary {
+  month: string;
+  total_cents: number;
+  item_count: number;
+}
+
+// Friend types
+export interface FriendInvite {
+  id: number;
+  from_user_id: number;
+  to_email: string;
+  to_user_id?: number;
+  status: string;
+  created_at: string;
+}
+
+export interface FriendInfo {
+  user_id: number;
+  name: string;
+  email: string;
+  added_at: string;
+}
+
+export interface LeaderboardEntry {
+  user_id: number;
+  name: string;
+  week_calories: number;
+  current_streak: number;
+  rank: number;
+}

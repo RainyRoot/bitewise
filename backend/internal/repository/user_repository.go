@@ -19,6 +19,7 @@ type UserRepository interface {
 	GetAllergies(ctx context.Context, userID int64) ([]domain.UserAllergy, error)
 	SetPreferences(ctx context.Context, userID int64, prefs []domain.UserPreference) error
 	GetPreferences(ctx context.Context, userID int64) ([]domain.UserPreference, error)
+	Delete(ctx context.Context, userID int64) error
 }
 
 // SQLiteUserRepository implements UserRepository using SQLite.
@@ -105,6 +106,14 @@ func (r *SQLiteUserRepository) Update(ctx context.Context, user *domain.User) er
 	)
 	if err != nil {
 		return fmt.Errorf("updating user: %w", err)
+	}
+	return nil
+}
+
+func (r *SQLiteUserRepository) Delete(ctx context.Context, userID int64) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, userID)
+	if err != nil {
+		return fmt.Errorf("deleting user: %w", err)
 	}
 	return nil
 }

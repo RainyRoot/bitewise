@@ -3,22 +3,33 @@ import type {
   Achievement,
   AuthResponse,
   CreateRecipeRequest,
+  DiaryEntry,
+  DiaryEntryRequest,
   FoodItem,
   FoodLog,
   FoodLogRequest,
+  FriendInfo,
+  FriendInvite,
+  LeaderboardEntry,
   LoginRequest,
   MealPlan,
   MealPlanEntry,
+  MonthlyMoodSummary,
   MonthlyStats,
   NutritionSummary,
   PantryItem,
   PantryMatch,
+  PriceLog,
+  PriceLogRequest,
+  PriceTrend,
   Recipe,
   RecipeFilter,
   RegisterRequest,
   SeasonalResponse,
   SharedRecipe,
   ShoppingList,
+  SpendingSummary,
+  StoreComparison,
   StreakInfo,
   User,
   UserAchievement,
@@ -377,6 +388,118 @@ export const stats = {
   },
 };
 
+// Diary
+export const diary = {
+  createOrUpdate: async (data: DiaryEntryRequest): Promise<DiaryEntry> => {
+    return request<DiaryEntry>('/api/v1/diary', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getByDate: async (date: string): Promise<DiaryEntry | null> => {
+    return request<DiaryEntry | null>(`/api/v1/diary?date=${date}`);
+  },
+
+  getMonthly: async (month: string): Promise<MonthlyMoodSummary> => {
+    return request<MonthlyMoodSummary>(`/api/v1/diary/monthly?month=${month}`);
+  },
+
+  delete: async (id: number): Promise<void> => {
+    return request<void>(`/api/v1/diary/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Prices
+export const prices = {
+  log: async (data: PriceLogRequest): Promise<PriceLog> => {
+    return request<PriceLog>('/api/v1/prices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getLogs: async (limit?: number): Promise<PriceLog[]> => {
+    const qs = limit ? `?limit=${limit}` : '';
+    return request<PriceLog[]>(`/api/v1/prices${qs}`);
+  },
+
+  getTrend: async (item: string): Promise<PriceTrend> => {
+    return request<PriceTrend>(`/api/v1/prices/trends?item=${encodeURIComponent(item)}`);
+  },
+
+  compareStores: async (item: string): Promise<StoreComparison> => {
+    return request<StoreComparison>(`/api/v1/prices/compare?item=${encodeURIComponent(item)}`);
+  },
+
+  getSpending: async (month?: string): Promise<SpendingSummary> => {
+    const qs = month ? `?month=${month}` : '';
+    return request<SpendingSummary>(`/api/v1/prices/spending${qs}`);
+  },
+};
+
+// Friends
+export const friends = {
+  invite: async (email: string): Promise<FriendInvite> => {
+    return request<FriendInvite>('/api/v1/friends/invite', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  getPendingInvites: async (): Promise<FriendInvite[]> => {
+    return request<FriendInvite[]>('/api/v1/friends/invites');
+  },
+
+  respondToInvite: async (inviteId: number, accept: boolean): Promise<void> => {
+    return request<void>(`/api/v1/friends/invites/${inviteId}`, {
+      method: 'POST',
+      body: JSON.stringify({ accept }),
+    });
+  },
+
+  list: async (): Promise<FriendInfo[]> => {
+    return request<FriendInfo[]>('/api/v1/friends');
+  },
+
+  remove: async (friendId: number): Promise<void> => {
+    return request<void>(`/api/v1/friends/${friendId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  getLeaderboard: async (): Promise<LeaderboardEntry[]> => {
+    return request<LeaderboardEntry[]>('/api/v1/leaderboard');
+  },
+};
+
+// Export
+export const dataExport = {
+  downloadCSV: async (): Promise<string> => {
+    const token = await getToken();
+    const response = await fetch(`${BASE_URL}/api/v1/export/csv`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return response.text();
+  },
+
+  downloadJSON: async (): Promise<string> => {
+    const token = await getToken();
+    const response = await fetch(`${BASE_URL}/api/v1/export/json`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return response.text();
+  },
+
+  deleteAccount: async (): Promise<void> => {
+    return request<void>('/api/v1/account', {
+      method: 'DELETE',
+    });
+  },
+};
+
 export const api = {
   auth,
   profile,
@@ -392,6 +515,10 @@ export const api = {
   sharing,
   notifications,
   stats,
+  diary,
+  prices,
+  friends,
+  dataExport,
 };
 
 export default api;
